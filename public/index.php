@@ -16,18 +16,20 @@ require_once __DIR__ . '/../vendor/autoload.php';
 
 $app = AppFactory::create();
 
+$app->addBodyParsingMiddleware();//https://www.slimframework.com/docs/v4/middleware/body-parsing.html
+
 $app->addRoutingMiddleware();
 $app->add(new BasePathMiddleware($app));
 
-//to catch any errors in the application
-$app->addErrorMiddleware(true, true, true);
+
+$app->addErrorMiddleware(true, true, true);//to catch any errors in the application
 
 $app->get('/', function (Request $request, Response $response) {
     $response->getBody()->write('Hello World!');
     return $response;
 });
 
-
+//GET (index/get all)
 $app->get('/customers-data/all', function (Request $request, Response $response) {
     $sql = "SELECT * FROM customers";
 
@@ -39,6 +41,119 @@ $app->get('/customers-data/all', function (Request $request, Response $response)
         $db = null;
 
         $response->getBody()->write(json_encode($customers));
+        return $response
+            ->withHeader('content-type', 'application/json')
+            ->withStatus(200);
+    } catch (PDOException $e) {
+        $error = array(
+            "message" => $e->getMessage()
+        );
+
+        $response->getBody()->write(json_encode($error));
+        return $response
+            ->withHeader('content-type', 'application/json')
+            ->withStatus(500);
+    }
+});
+
+//POST (create/store)
+$app->post('/customers-data/add', function (Request $request, Response $response, array $args) {
+    $data = $request->getParsedBody();
+    $name = $data["name"];
+    $email = $data["email"];
+    $phone = $data["phone"];
+
+    $sql = "INSERT INTO customers (name, email, phone) VALUES (:name, :email, :phone)";
+
+    try {
+        $db = new Db();
+        $conn = $db->connect();
+
+        $stmt = $conn->prepare($sql);
+        $stmt->bindParam(':name', $name);
+        $stmt->bindParam(':email', $email);
+        $stmt->bindParam(':phone', $phone);
+
+        $result = $stmt->execute();
+
+        $db = null;
+        $response->getBody()->write(json_encode($result));
+        return $response
+            ->withHeader('content-type', 'application/json')
+            ->withStatus(200);
+    } catch (PDOException $e) {
+        $error = array(
+            "message" => $e->getMessage()
+        );
+
+        $response->getBody()->write(json_encode($error));
+        return $response
+            ->withHeader('content-type', 'application/json')
+            ->withStatus(500);
+    }
+});
+
+//UPDATE (update)
+$app->put(
+    '/customers-data/update/{id}',
+    function (Request $request, Response $response, array $args)
+    {
+        $id = $request->getAttribute('id');
+        $data = $request->getParsedBody();
+        $name = $data["name"];
+        $email = $data["email"];
+        $phone = $data["phone"];
+
+        $sql = "UPDATE customers SET
+           name = :name,
+           email = :email,
+           phone = :phone
+ WHERE id = $id";
+
+        try {
+            $db = new Db();
+            $conn = $db->connect();
+
+            $stmt = $conn->prepare($sql);
+            $stmt->bindParam(':name', $name);
+            $stmt->bindParam(':email', $email);
+            $stmt->bindParam(':phone', $phone);
+
+            $result = $stmt->execute();
+
+            $db = null;
+            echo "Update successful! ";
+            $response->getBody()->write(json_encode($result));
+            return $response
+                ->withHeader('content-type', 'application/json')
+                ->withStatus(200);
+        } catch (PDOException $e) {
+            $error = array(
+                "message" => $e->getMessage()
+            );
+
+            $response->getBody()->write(json_encode($error));
+            return $response
+                ->withHeader('content-type', 'application/json')
+                ->withStatus(500);
+        }
+    });
+
+//DELETE (delete/destroy)
+$app->delete('/customers-data/delete/{id}', function (Request $request, Response $response, array $args) {
+    $id = $args["id"];
+
+    $sql = "DELETE FROM customers WHERE id = $id";
+
+    try {
+        $db = new Db();
+        $conn = $db->connect();
+
+        $stmt = $conn->prepare($sql);
+        $result = $stmt->execute();
+
+        $db = null;
+        $response->getBody()->write(json_encode($result));
         return $response
             ->withHeader('content-type', 'application/json')
             ->withStatus(200);
